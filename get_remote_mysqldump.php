@@ -15,7 +15,7 @@ $backupFileName = '/tmp/' . $database . date('_Ymd_His') . '.sql.gz';
 
 echo "Creating MySQL dump file for \"{$database}\" database on remote system...\n";
 // Step 1: Make DB dump on remote system
-if (!executeRemoteScript("mysqldump -u" . escapeshellarg($dbUser) . " -p" . escapeshellarg($dbPassword) . " " . escapeshellarg($database) . " | gzip > " . escapeshellarg($backupFileName))) {
+if (!executeRemoteScript("mysqldump -u" . escapeshellarg($dbUser) . " -p" . escapeshellargspecial($dbPassword) . " " . escapeshellarg($database) . " | gzip > " . escapeshellarg($backupFileName))) {
     exit(1);
 }
 
@@ -36,7 +36,7 @@ function executeRemoteScript(string $script): bool
     global $sshUserHost, $sshPassword;
     $tempRemoteScript = tempnam(sys_get_temp_dir(), 'get_remote_db_backup');
     file_put_contents($tempRemoteScript, $script);
-    passthru("plink -ssh -C -pw " . escapeshellarg($sshPassword) . " -m " . escapeshellarg($tempRemoteScript) . " " . escapeshellarg($sshUserHost), $retCode);
+    passthru("plink -ssh -C -pw " . escapeshellargspecial($sshPassword) . " -m " . escapeshellarg($tempRemoteScript) . " " . escapeshellarg($sshUserHost), $retCode);
     unlink($tempRemoteScript);
     return $retCode === 0;
 }
@@ -44,7 +44,7 @@ function executeRemoteScript(string $script): bool
 function downloadRemoteFile($remoteFile): bool
 {
     global $sshUserHost, $sshPassword, $destinationDir;
-    passthru("pscp -pw " . escapeshellarg($sshPassword) . " " . escapeshellarg($sshUserHost . ":" . $remoteFile) . ' ' . escapeshellarg($destinationDir), $retCode);
+    passthru("pscp -pw " . escapeshellargspecial($sshPassword) . " " . escapeshellarg($sshUserHost . ":" . $remoteFile) . ' ' . escapeshellarg($destinationDir), $retCode);
     return $retCode === 0;
 }
 
@@ -54,4 +54,13 @@ function printHelp()
     echo "Usage:\n";
     echo "\tphp " . basename(__FILE__) . " <ssh-user@host> <ssh-password> <database> <db-user> <db-password> [<destination-dir>]\n";
     echo "\nPlease note that this utility depends on the PuTTY package. It needs plink.exe & pscp.exe. And they should be in %PATH% environment variable\n";
+}
+
+/**
+ * Replacement of escapeshellarg() to deal with special characters. Some password can contain "!" symbols, original
+ * escapeshellarg() replaces them by spaces.
+ */
+function escapeshellargspecial($arg)
+{
+    return '"' . str_replace("'", "'\"'\"'", $arg) . '"';
 }
